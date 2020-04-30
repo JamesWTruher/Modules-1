@@ -174,7 +174,7 @@ function Get-KubeResource
         write-debug "running!"
         $res = Invoke-KubeCtl -verb "" -resource "api-resources"  -noJson -arguments @("-o","wide") -noAllNamespace
         $FIELDS = "NAME","SHORTNAMES","APIGROUP","NAMESPACED","KIND","VERBS"
-        $offsets = $FIELDS.ForEach({$res[0].IndexOf($_)})
+        $offsets = $FIELDS.ForEach({$res[0].IndexOf("$_")})
         $script:KUBERESOURCES = $res[1..($res.count-1)].Foreach({[KubeResource]::new($offsets,$_)}).Where({$_.name -match $name})
     }
     return $script:KUBERESOURCES
