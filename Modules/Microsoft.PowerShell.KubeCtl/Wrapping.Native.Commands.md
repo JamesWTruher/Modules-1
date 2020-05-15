@@ -46,6 +46,13 @@ There a many benefits in a complete rewrite of a command
 
 #### Issues with application wrapping
 
+#### Shades of wrapping
+
+### Just use the native app
+
 ## Is there a better way?
 
-## possibilities in wrapping
+### Possibilities in wrapping
+
+## Call to action
+
