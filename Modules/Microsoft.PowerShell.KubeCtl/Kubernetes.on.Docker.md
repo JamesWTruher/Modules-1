@@ -119,3 +119,42 @@ Total mem: 1990MB
 Platform: linux
 Uptime: 11776
 ```
+
+## Kubernetes Dashboard
+
+We can also access the kubernetes dashboard, but we have some set up to do first:
+
+Create a service account
+
+```powershell
+kubectl create serviceaccount dashboard-admin-sa
+```
+
+create a binding for the new account to a role:
+
+```powershell
+kubectl create clusterrolebinding dashboard-admin-sa --clusterrole=cluster-admin --serviceaccount=default:dashboard-admin-sa
+```
+
+now get the token associated with the service (but you need the "real" name of the secret):
+
+```powershell
+kubectl get secrets                 
+NAME                             TYPE                                  DATA   AGE
+dashboard-admin-sa-token-f8qwd   kubernetes.io/service-account-token   3      13m
+default-token-2qv9g              kubernetes.io/service-account-token   3      12d
+```
+
+$sec = kubectl get secret dashboard-admin-sa-token-f8qwd -o json | convertfrom-json
+$bytes = [Convert]::FromBase64String($sec.data.token)
+$token = [Text.Encoding]::UTF8.GetString($bytes)
+$token
+```
+
+in another window, start the ui proxy (this will block):
+
+```powershell
+kubectl proxy
+```
+
+then in a browser navigate to `http://127.0.0.1:8001` and when prompted for login - select "token" and provide the string in `$token` above to login.
