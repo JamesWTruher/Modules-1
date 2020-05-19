@@ -51,3 +51,9 @@ There a many benefits in a complete rewrite of a command
 ## possibilities in wrapping
 
 ## Is this framework something you will continue to build commands with?
+
+Jim, just adding some thought notes.  Always available to discuss with you and help out.
+
+Our focus is on providing the community with an extensable framework to build powershell-style cmdlets from common commands.  While we may supply some commands (kubectl, docker), our hope is that the community will adopt the framework and build commands as needed. 
+  - Is an extensable framework for building commands needed? Why?
+  - If so, what commands should be considered in the near term? Why those commands? How often do you use/script them?
