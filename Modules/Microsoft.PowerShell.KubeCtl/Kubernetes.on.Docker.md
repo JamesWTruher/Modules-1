@@ -157,4 +157,4 @@ in another window, start the ui proxy (this will block):
 kubectl proxy
 ```
 
-then in a browser navigate to `http://127.0.0.1:8001` and when prompted for login - select "token" and provide the string in `$token` above to login.
+then in a browser navigate to `http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/login` and when prompted for login - select "token" and provide the string in `$token` above to login.
