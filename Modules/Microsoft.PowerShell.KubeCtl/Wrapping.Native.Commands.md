@@ -115,18 +115,50 @@ I believe that the second section is well understood by PowerShell scripters, bu
 This means that if you want to use these REST APIs, you need to put on a developer hat and produce a solution with a different set of problems.
 This is what the developer did initially; He took the available APIs (REST or otherwise) and built up the administrative experience in the application,
 sheltering the admin from the programming problems.
-In the kubernetes example above, if I needed to query the REST enddpoint to see what types of resources were available, that means more calls back and forth from the service.
-
+In the kubernetes example above, if I needed to query the REST endpoint to see what types of resources were available, that means more calls back and forth from the service.
 
 ### Native Application Wrapping
 
+Because it is possible to call native applications easily from within PowerShell it is possible to write a script which provides a more PowerShell-like experience.
+It can provide parameter handling such as prompting for mandatory parameters and tab-completion for parameter values.
+It can take the application output and use the text output into objects so it can take advantage of all the post processing tools such as `Sort-Object`, `Where-Object`, etc.
+One of my first experiences with this was a very simple processes of getting information about pdf files with the tool `pdfinfo.exe`.
+I needed to retrieve information from a very large set of set of PDF files (1000s).
+I wrapped both the parameters and the output to have it behave much like a regular cmdlet.
+Of course, I could have just used the native app, but I wanted a command I could pipe files to it and filter the results:
+
+```powershell
+$a = get-childitem -rec -filt *.pdf | Get-PdfInfo | Where-Object { $_.subject -like "sibelius" }
+$sa | ft file,title,subject,pagesize
+
+File           Title                        Subject            Pagesize
+----           -----                        -------            --------
+SIB08.pdf      Sibelius - Finlandia, Op. 26 Trumpet            720x936 pts
+SIB08.pdf      Sibelius - Finlandia, Op. 26 Viola              720x936 pts
+...
+SIB08.pdf      Sibelius - Finlandia, Op. 26 Cello              720x936 pts
+SIB08.pdf      Sibelius - Finlandia, Op. 26 Bassoon            720x936 pts
+```
+
+The point of all this was that I wanted a native PowerShell experience rather than the experience provided by the standalone application.
+
 #### Issues with application wrapping
+
+The issues are roughly the same as above, there is a certain amount of programming that is needed to call the application.
+There is more programming needed to convert the text output to objects so they can participate in the PowerShell pipelines.
+A significant difference is that unlike the REST approach, I don't have extra work determining _how_ to invoke the app, I can just invoke it.
+Further, it seems a more natural use of the tool; I'm familiar with the workings of the tool, I'm just parsing the output into objects.
+It's important to note that if the tool were to emit json or xml, a lot less effort would be needed to create the objects that I want.
 
 ## Is there a better way
 
 It may be possible to create a framework which inspects the output of the help of utility and _automatically_ create the code which uses
 
 ## possibilities in wrapping
+
+The aspect which makes this possible is that some commands have regular, consistent help which describes how the application can be used.
+If this is the case, then we can iteratively call the help, parse it,
+and automatically construct much of the infrastructure needed to allow these native applications to be encorporated into the PowerShell environment.
 
 ## Is this framework something you will continue to build commands with?
 
