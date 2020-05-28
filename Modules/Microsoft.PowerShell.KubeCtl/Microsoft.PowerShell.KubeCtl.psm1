@@ -42,7 +42,7 @@ function Get-KubeDeployment
 }
 
 $proxyFunctions = @{
-    "get:deployment" = {
+    "get:deployments" = {
         [CmdletBinding()]
         param ($name = ".*")
         $items = Invoke-KubeCtl -verb get -resource deployment
@@ -55,6 +55,18 @@ $proxyFunctions = @{
         $items = Invoke-KubeCtl -verb get -resource pod
         $items.foreach({[Pod]::new($_)}).Where({$_.Name -match $name})
         }
+    "get:endpoints" = {
+        [CmdletBinding()]
+        param ($name = ".*")
+        $items = Invoke-KubeCtl -verb get -resource endpoints
+        $items.ForEach({[endpoints]::new($_)}).Where({$_.name -match "$name"})
+    }
+    "get:events" = {
+        [CmdletBinding()]
+        param ($name = ".*")
+        $items = Invoke-KubeCtl -verb get -resource events
+        $items.ForEach({[events]::new($_)}).Where({$_.name -match "$name"})
+    }
 }
 
 # NAMESPACE     NAME                                      READY   STATUS      RESTARTS   AGE     IP           NODE            NOMINATED NODE   READINESS GATES
@@ -177,7 +189,7 @@ function Get-KubeResource
         $offsets = $FIELDS.ForEach({$res[0].IndexOf("$_")})
         $script:KUBERESOURCES = $res[1..($res.count-1)].Foreach({[KubeResource]::new($offsets,$_)}).Where({$_.name -match $name})
     }
-    return $script:KUBERESOURCES
+    return $script:KUBERESOURCES.Where({$_.name -match $name})
 }
 
 function Initialize-ProxyFunction

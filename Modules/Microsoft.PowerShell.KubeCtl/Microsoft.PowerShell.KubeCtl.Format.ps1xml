@@ -60,5 +60,36 @@
     </TableControl>
    </View>
 
+   <View>
+    <Name>KubeResourceTable</Name>
+    <ViewSelectedBy>
+     <TypeName>KubeResource</TypeName>
+    </ViewSelectedBy>
+    <TableControl>
+     <TableHeaders>
+      <TableColumnHeader><Label>Name</Label></TableColumnHeader>
+      <TableColumnHeader><Label>Shortnames</Label></TableColumnHeader>
+      <TableColumnHeader><Label>apigroup</Label></TableColumnHeader>
+      <TableColumnHeader><Label>namespaced</Label></TableColumnHeader>
+      <TableColumnHeader><Label>kind</Label></TableColumnHeader>
+      <TableColumnHeader><Label>verbs</Label></TableColumnHeader>
+     </TableHeaders>
+     <TableRowEntries>
+      <TableRowEntry>
+       <TableColumnItems>
+        <TableColumnItem><PropertyName>Name</PropertyName></TableColumnItem>
+        <TableColumnItem><PropertyName>Shortnames</PropertyName></TableColumnItem>
+        <TableColumnItem><PropertyName>apigroup</PropertyName></TableColumnItem>
+        <TableColumnItem><PropertyName>namespaced</PropertyName></TableColumnItem>
+        <TableColumnItem><PropertyName>kind</PropertyName></TableColumnItem>
+        <TableColumnItem><PropertyName>verbs</PropertyName></TableColumnItem>
+       </TableColumnItems>
+      </TableRowEntry>
+     </TableRowEntries>
+    </TableControl>
+   </View>
+
+
+
    </ViewDefinitions>
 </Configuration>
