@@ -91,7 +91,7 @@
       },
       {
         "PropertyName": "SOURCE",
-        "PropertyReference": "$s = $o.source; $s.host ? (($s.component,$s.host) -join ', ') : ($s.component)"
+        "PropertyReference": ".{$s = $o.source; $s.host ? (($s.component,$s.host) -join ', ') : ($s.component)}"
       },
       {
         "PropertyName": "MESSAGE",
@@ -150,11 +150,11 @@
       },
       {
         "PropertyName": "STATUS",
-        "PropertyReference": "($o.status.conditions | where-object type -eq 'ready' | where-object type -eq 'True') ? 'Ready' : 'Not Ready'"
+        "PropertyReference": "$o.status.conditions.where({$_.type -eq 'ready' -and $_.status -eq 'True'}) ? 'Ready' : 'Not Ready'"
       },
       {
         "PropertyName": "ROLES",
-        "PropertyReference": "$o.metadata.labels.psobject.properties|? name -match 'node-role').name.split('/')[1]"
+        "PropertyReference": "($o.metadata.labels.psobject.properties|? name -match 'node-role').name.split('/')[1]"
       },
       {
         "PropertyName": "AGE",
@@ -162,27 +162,27 @@
       },
       {
         "PropertyName": "VERSION",
-        "PropertyReference": "$o.nodeinfo.kubeproxyversion"
+        "PropertyReference": "$o.status.nodeinfo.kubeproxyversion"
       },
       {
         "PropertyName": "INTERNAL-IP",
-        "PropertyReference": "$o.status.addresses|? type -eq 'internalip'|select-object -expand address"
+        "PropertyReference": "$o.status.addresses.where({$_.type -eq 'internalip'}).address"
       },
       {
         "PropertyName": "EXTERNAL-IP",
-        "PropertyReference": "$ip = $o.status.addresses|? type -eq 'externalip'|select-object -expand address; $ip ? $ip : '<none>'"
+        "PropertyReference": "$o.status.addresses.where({$_.type -eq 'externalip'}).address"
       },
       {
         "PropertyName": "OS-IMAGE",
-        "PropertyReference": "$o.nodeinfo.osimage"
+        "PropertyReference": "$o.status.nodeinfo.osimage"
       },
       {
         "PropertyName": "KERNEL-VERSION",
-        "PropertyReference": "$o.nodeinfo.kernelVersion"
+        "PropertyReference": "$o.status.nodeinfo.kernelVersion"
       },
       {
         "PropertyName": "CONTAINER-RUNTIME",
-        "PropertyReference": "$o.nodeinfo.containerRuntimeVersion"
+        "PropertyReference": "$o.status.nodeinfo.containerRuntimeVersion"
       }
     ]
   },
@@ -367,10 +367,10 @@
       },
       {
         "PropertyName": "EXTERNAL-IP",
-        "PropertyReference": "$o.spec.externalIPs -eq $null ? '<none>' : $o.spec.externalIPs"
+        "PropertyReference": "$o.spec.externalIPs"
       },
       {
-        "PropertyName": "PORT(S)",
+        "PropertyName": "PORT",
         "PropertyReference": "$o.spec.ports.Foreach({$_.nodePort ? ('{0}:{1}/{2}' -f $_.port,$_.nodeport,$_.protocol) : ('{0}/{1}' -f $_.port,$_.protocol)})"
       },
       {
@@ -434,7 +434,7 @@
       },
       {
         "PropertyName": "SERVICE",
-        "PropertyReference": "$svc = $o.spec.service; $svc ? ('{0}/{1}' -f $svc.namespace,$svc.name) : 'Local'"
+        "PropertyReference": ".{$svc = $o.spec.service; $svc ? ('{0}/{1}' -f $svc.namespace,$svc.name) : 'Local'}"
       },
       {
         "PropertyName": "AVAILABLE",
@@ -730,7 +730,7 @@
       },
       {
         "PropertyName": "DURATION",
-        "PropertyReference": "$ct = $o.status.completiontime; $st = $o.status.startTime; $ct ? ($ct - $st) : ([datetime]::now - $st)"
+        "PropertyReference": ".{$ct = $o.status.completiontime; $st = $o.status.startTime; $ct ? ($ct - $st) : ([datetime]::now - $st)}"
       },
       {
         "PropertyName": "AGE",
@@ -746,7 +746,7 @@
       },
       {
         "PropertyName": "SELECTOR",
-        "PropertyReference": "$o.spec.selector"
+        "PropertyReference": "$o.spec.selector.matchlabels.psobject.properties.foreach({'{0}={1}' -f $_.name,$_.value})"
       }
     ]
   },
@@ -830,7 +830,7 @@
       },
       {
         "PropertyName": "HOSTS",
-        "PropertyReference": "$hosts = $o.spec.rules.host; $hosts ? $hosts : '*'"
+        "PropertyReference": "$o.spec.rules.host ? $o.spec.rules.host : '*'"
       },
       {
         "PropertyName": "ADDRESS",
@@ -838,7 +838,7 @@
       },
       {
         "PropertyName": "PORTS",
-        "PropertyReference": "$o.spec.tls ? 80 : 80,443"
+        "PropertyReference": "$o.spec.tls ? 80,443 : 80"
       },
       {
         "PropertyName": "AGE",
@@ -872,7 +872,7 @@
     "Fields": [
       { "PropertyName": "NAMESPACE",      "PropertyReference": "$o.metadata.NAMESPACE" },
       { "PropertyName": "NAME",           "PropertyReference": "$o.metadata.NAME" },
-      { "PropertyName": "PRIV",           "PropertyReference": "$p = $o.spec.privileged;$r = $null; $p ? ([bool]::tryparse($p,[ref]$r) ? $r : $false) : $false" },
+      { "PropertyName": "PRIV",           "PropertyReference": ".{$p = $o.spec.privileged;$r = $null; $p ? ([bool]::tryparse($p,[ref]$r) ? $r : $false) : $false}" },
       { "PropertyName": "CAPS",           "PropertyReference": "$o.spec.allowedCapabilities.rule" },
       { "PropertyName": "SELINIX",        "PropertyReference": "$o.spec.seLinux.rule" },
       { "PropertyName": "RUNASUSER",      "PropertyReference": "$o.spec.runAsUser.rule" },

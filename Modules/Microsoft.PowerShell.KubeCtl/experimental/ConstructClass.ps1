@@ -30,24 +30,27 @@ $objectHeaders = $cmdletInfoAndOutput | ForEach-Object {
     return $tmpConfigJson
 }
 
-function Get-ClassDefinition ( [psobject]$configuration, [ref]$className ) {
+function Get-ClassDefinition ( [psobject]$configuration, [ref]$className )
+{
     $outputType = $configuration.TypeName
     $className.Value = $outputType
-    'class ' + $outputType + " {"
-    '# fields'
-    $configuration.Fields.Foreach({'    [object]$' + $textinfo.ToTitleCase($_.PropertyName.ToLower())})
-    '# originalObject member'
-    '    hidden [psobject]$originalObject'
-    ""
-    '# constructor'
-    "    $outputType ([pscustomobject]`$o) {"
-    '    if ( $env:DebugAutoConstructor -eq $true ) {'
-    '        wait-debugger'
-    '    }'
-    $configuration.Fields.Foreach({'        $this.' +  $textinfo.ToTitleCase($_.PropertyName.ToLower()) + ' = ' + $_.PropertyReference})
-    '        $this.originalObject = $o'
-    '    }'
-    '}'
+    $sb = [System.Text.StringBuilder]::new()
+    $null = $sb.AppendLine('class ' + $outputType + " {")
+    $null = $sb.AppendLine('# fields')
+    $null = $configuration.Fields.Foreach({$sb.AppendLine('    [object]$' + $textinfo.ToTitleCase($_.PropertyName.ToLower().Replace(" ","").Replace("-","")))})
+    $null = $sb.AppendLine('    hidden [psobject]$originalObject')
+    $null = $sb.AppendLine('# originalObject member')
+    $null = $sb.AppendLine("")
+    $null = $sb.AppendLine('# constructor')
+    $null = $sb.AppendLine("    $outputType ([pscustomobject]`$o) {")
+    $null = $sb.AppendLine('    if ( $env:DebugAutoConstructor -eq $true ) {')
+    $null = $sb.AppendLine('        wait-debugger')
+    $null = $sb.AppendLine('    }')
+    $null = $configuration.Fields.Foreach({$sb.AppendLine('        $this.' +  $textinfo.ToTitleCase($_.PropertyName.ToLower().Replace(" ","").Replace("-","")) + ' = ' + $_.PropertyReference)})
+    $null = $sb.AppendLine('        $this.originalObject = $o')
+    $null = $sb.AppendLine('    }')
+    $null = $sb.AppendLine('}')
+    return $sb.ToString()
 }
 
 $kClassConfigFile = New-ClassConfigFile
