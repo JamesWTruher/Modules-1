@@ -28,7 +28,7 @@ class UsageInfo {
                 break
             }
         }
-        $this.Usage = $this.originalText -join [environment]::newline
+        $this.Usage = ($this.originalText -join [environment]::newline).Trim()
         if ( $this.Usage -match "\[flags\]") { $this.supportsFlags = $true }
         if ( $this.Usage -match "\[options\]") { $this.hasOptions = $true }
     }
@@ -103,7 +103,9 @@ class ParameterInfo {
             $this.OriginalParameterName = "--${pname}"
             $pDefaultValue = $default.Trim("'")
             # $this.Name = "${pname}" # .Trim() -replace "-(.)",{($_ -replace "-").ToUpper()} -replace "^(.)",{"$_".ToUpper()}
+            # strip away all the "-" and capitalize the first letter of every "word"
             $this.Name = ("${pname}" -split "-").foreach({${script:TextInfo}.ToTitleCase($_)}) -join ""
+            if ( $this.Name -eq "DryRun" ) { $this.Name = "WhatIf" }
             $this.Description = $matches['Description'].Trim()
             $this.IsMandatory = $isMandatory
             $this.Parsed = $true
@@ -186,11 +188,11 @@ class ParameterInfo {
 
 # general options for kubectl are a little different. The tag does not exist, so we will force it
 class KubeGeneralOptions {
-    [ParameterInfo[]]$Parameters
-    KubeGeneralOptions() {
+    static [ParameterInfo[]]$Parameters
+    static KubeGeneralOptions() {
         $text = Invoke-Kubectl options | Where-Object { "$_" }
         $text[0] = "Options:"
-        $this.Parameters = [ParameterInfo]::GetParameters($text)
+        [KubeGeneralOptions]::Parameters = [ParameterInfo]::GetParameters($text)
     }
 }
 
@@ -205,9 +207,14 @@ class Command {
     [ExampleInfo[]]$Examples
     hidden [string[]]$originalText
 
-    Command ([string]$command, [string[]]$text ) {
-        $this.Command = "$command".Trim()
-        $this.CommandElements = "$command".Trim()
+    # don't check the MandatoryParameters, or the CommonParameters
+    [bool]SupportsWhatIf() {
+        return [bool]$this.Parameters.Where({$_.Name -eq "WhatIf"})
+    }
+
+    Command ([string[]]$command, [string[]]$text ) {
+        $this.Command = ($command -join " ").Trim()
+        $this.CommandElements = $command # "$command".Trim()
         $this.originalText = $text
         #$c,$d = "$text".Trim().Split("  ", 2, [System.StringSplitOptions]::RemoveEmptyEntries) | ForEach-Object {"$_".Trim()}
         #$this.Command = $c
@@ -230,9 +237,10 @@ class Command {
                 while ( $i -lt $text.count -and $text[$i][0] -eq " " ) {
                     $subcmd,$desc = $text[$i].Trim().split(" ",2, [System.StringSplitOptions]::RemoveEmptyEntries)
                     # we need to add help specifically here, since we're invoking kubectl directly
-                    $elements = $commandElements + @($subcmd) + "--help"
-                    $subText = Invoke-Kubectl $elements
-                    $sc = [Command]::new($subcmd, $subText)
+                    $elements = $commandElements + @($subcmd)
+                    $subText = Invoke-Kubectl ($elements + "--help")
+#                    $sc = [Command]::new($subcmd, $subText)
+                    $sc = [Command]::new($elements, $subText)
                     $sc.CommandElements = $elements
                     $subCmds += $sc
         ######
@@ -306,7 +314,48 @@ class Command {
     }
 
     [string]CreateParamStatement() {
-        return "param (`n{0} )" -f $this.Parameters.Foreach({$_.ToString}) -join ",`n"
+        $sb = [System.Text.StringBuilder]::new()
+        $param = $()
+        $sb.AppendLine("param (")
+        $this.MandatoryParameters.Foreach({$param += $_.ToString()})
+        $this.Parameters.Foreach({$param += $_.ToString()})
+        $sb.AppendLine(($param -join ",`n")) # comma separate the parameters
+        $sb.AppendLine(")")
+        return $sb.ToString()
+    }
+
+    [string]CreateCommentBasedHelp() {
+        $sb = [System.Text.StringBuilder]::new()
+        $sb.AppendLine("<#")
+        $sb.AppendLine(".SYNOPSIS")
+        $sb.AppendLine($this.Description.Split("`n")[0])
+        $sb.AppendLine()
+        $sb.AppendLine(".DESCRIPTION")
+        $sb.AppendLine($this.Description)
+        $sb.AppendLine("The native usage for this command is:")
+        $sb.AppendLine("  " + $this.Usage.Usage)
+        $sb.AppendLine()
+        foreach ( $p in $this.MandatoryParameters ) {
+            $sb.AppendLine(".PARAMETER")
+            $sb.AppendLine($p.Name)
+            $sb.AppendLine($p.Description)
+            $sb.AppendLine("The original kubenetes parameter is {0}" -f $p.OriginalParameterName)
+            $sb.AppendLine()
+        }
+        foreach ( $p in $this.Parameters ) {
+            $sb.Append(".PARAMETER ")
+            $sb.AppendLine($p.Name)
+            $sb.AppendLine($p.Description)
+            $sb.AppendLine()
+        }
+        foreach ( $e in $this.Examples ) {
+            $sb.AppendLine(".EXAMPLE")
+            $sb.AppendLine('$ ' + $e.Command)
+            $sb.AppendLine($e.Description)
+            $sb.AppendLine()
+        }
+        $sb.AppendLine("#>")
+        return $sb.ToString()
     }
 
     static [string]GetDescription([string[]]$text) {
@@ -381,7 +430,7 @@ function Get-CommandInfo ( [string[]]$commandElements ) {
 }
 function Get-KubeCtlGeneralOptions
 {
-    [KubeGeneralOptions]::new()
+    [KubeGeneralOptions]::Parameters
 }
 
 function Get-KubeCommands ()

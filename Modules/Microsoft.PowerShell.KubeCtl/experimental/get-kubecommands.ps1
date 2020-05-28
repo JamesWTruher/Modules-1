@@ -98,4 +98,4 @@ foreach ( $topic in $topics ) {
     }
     $topic['SubTopicUsage'] = $subTopicUsage
 }
-$topics
+$topics.ForEach({[pscustomobject]$_})
