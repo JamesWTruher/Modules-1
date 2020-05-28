@@ -7,3 +7,6 @@ project.lock.json
 /**/.vscode/
 
 *.swp
+
+# mac desktop files
+.DS_Store
