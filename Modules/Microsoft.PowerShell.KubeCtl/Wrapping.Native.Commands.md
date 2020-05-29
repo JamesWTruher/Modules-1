@@ -36,13 +36,18 @@ To achieve coverage for tools that participate fully in the PowerShell ecosystem
 
 There a many benefits in a complete rewrite of a command:
 
-* The expression of behavior can be made more "native"
-* ...
+* The expression of behavior can be made more "native" to the new environment
+* Performance issues can be addressed
+* New code means that new technologies can be used advantageously
 
 #### Issues with Reimplementations
 
 The biggest issue with reimplementation is probably the amount of work that is needed to achieve behavior expressed in the original.
 This is especially the case if the reimplementor is not intimately familiar with the workings of the tool.
+Another issue with reimplementation is that you need to continue to track changes in the original code.
+This can be a challenge as depending on the activity and updates in the tool, wholescale changes can occur which then need to be reimplemented,
+or the reimplementation will be out of date.
+Worse, if the the command is the client side of a client/server app, changes in the server may negatively effect the reimplementation.
 
 TODO:  Jim, is it worth pointing out here that reimplementation is a short sighted view of the world - there will be updates to the original command functionality, sometimes very frequently.  My experience is that as a maintainer, my cost is rasied so high to maintain, that its not worth the initial time to develop the reimplenetation.  I guess this applies to wrapping teh command as well.
 
@@ -126,6 +131,9 @@ TODO - I use to have (at the tip of my tongue) an example of swagger cmdlets tha
 Because it is possible to call native applications easily from within PowerShell it is possible to write a script which provides a more PowerShell-like experience.
 It can provide parameter handling such as prompting for mandatory parameters and tab-completion for parameter values.
 It can take the application output and use the text output into objects so it can take advantage of all the post processing tools such as `Sort-Object`, `Where-Object`, etc.
+This approach has some advantages:
+
+* We are using an interface
 
 TODO: Jim, in the above list, would it be also good to mention somethig like : It can update itself when the originating native command updates.
 
