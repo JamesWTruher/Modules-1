@@ -438,7 +438,7 @@
       },
       {
         "PropertyName": "AVAILABLE",
-        "PropertyReference": "$o.status.conditions.Where({$_.type -eq 'Available'}).status"
+        "PropertyReference": "try{[bool]::Parse($o.status.conditions.Where({$_.type -eq 'Available'}).status)} catch { $false }"
       },
       {
         "PropertyName": "AGE",
@@ -859,7 +859,7 @@
       },
       {
         "PropertyName": "PODSELECTOR",
-        "PropertyReference": "$o.spec.podSelectormatchlabels.psobject.properties.foreach({'{0}={1}' -f $_.name,$_.value})"
+        "PropertyReference": "$o.spec.podSelector.matchlabels.psobject.properties.foreach({'{0}={1}' -f $_.name,$_.value})"
       },
       {
         "PropertyName": "AGE",

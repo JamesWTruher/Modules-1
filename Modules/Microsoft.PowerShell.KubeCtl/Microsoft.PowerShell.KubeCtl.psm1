@@ -1,3 +1,5 @@
+$TextInfo = [CultureInfo]::new("en-us",$false).TextInfo
+
 class Readiness {
     [int]$Count
     [int]$Ready
@@ -32,6 +34,80 @@ class Deployment
         $this.Available = $o.status.availableReplicas
         $this.StartDate = $o.metadata.creationTimestamp
     }
+}
+
+
+
+function Get-ClassDefinition ( [psobject]$configuration, [ref]$className )
+{
+    $outputType = $configuration.TypeName
+    $className.Value = $outputType
+    $sb = [System.Text.StringBuilder]::new()
+    $null = $sb.AppendLine('class ' + $outputType + " {")
+    $null = $sb.AppendLine('# fields')
+    $null = $configuration.Fields.Foreach({$sb.AppendLine('    [object]$' + $textinfo.ToTitleCase($_.PropertyName.ToLower().Replace(" ","").Replace("-","")))})
+    $null = $sb.AppendLine('    hidden [psobject]$originalObject')
+    $null = $sb.AppendLine('# originalObject member')
+    $null = $sb.AppendLine("")
+    $null = $sb.AppendLine('# constructor')
+    $null = $sb.AppendLine("    $outputType ([pscustomobject]`$o) {")
+    $null = $sb.AppendLine('    if ( $env:DebugAutoConstructor -eq $true ) {')
+    $null = $sb.AppendLine('        wait-debugger')
+    $null = $sb.AppendLine('    }')
+    $null = $configuration.Fields.Foreach({$sb.AppendLine('        $this.' +  $textinfo.ToTitleCase($_.PropertyName.ToLower().Replace(" ","").Replace("-","")) + ' = ' + $_.PropertyReference)})
+    $null = $sb.AppendLine('        $this.originalObject = $o')
+    $null = $sb.AppendLine('    }')
+    $null = $sb.AppendLine('}')
+    return $sb.ToString()
+}
+
+function Get-ResourceTypes ( [string]$resourceJson = "${psscriptroot}/ResourceConfiguration.json")
+{
+    $script:classStrings = @()
+    $resources = Get-Content $resourceJson | ConvertFrom-Json
+    foreach ($resourceType in $resources) {
+        [ref]$className = ""
+        $classdef = Get-ClassDefinition -configuration $resourceType -className $className
+        # create the classes only if they're not already available
+        if ( ! ("$className" -as [type]) ) {
+            $script:classStrings += $classdef
+        }
+    }
+    # this instantiates all the types that will be needed
+    return ($script:classStrings -join "`n`n")
+}
+
+function Initialize-Formatters ( [string]$resourceJson = "${psscriptroot}/ResourceConfiguration.json")
+{
+    $resources = Get-Content $resourceJson | ConvertFrom-Json
+    $generatedFormatFile = "${PSScriptRoot}/Generated.Format.ps1xml"
+    .{
+        '<Configuration>'
+        '  <ViewDefinitions>'
+        foreach ( $resource in $resources ) {
+            '    <View>'
+            '     <Name>{0}Table</Name>' -f $resource.TypeName
+            '     <ViewSelectedBy>'
+            '      <TypeName>{0}</TypeName>' -f $resource.TypeName
+            '     </ViewSelectedBy>'
+            '     <TableControl>'
+            '      <TableHeaders>'
+            $resource.Fields.Foreach({'         <TableColumnHeader><Label>{0}</Label></TableColumnHeader>' -f $textInfo.ToTitleCase($_.PropertyName.ToLower().Replace(" ","").Replace("-",""))})
+            '      </TableHeaders>'
+            '      <TableRowEntries>'
+            '       <TableRowEntry>'
+            '        <TableColumnItems>'
+            $resource.Fields.Foreach({'         <TableColumnItem><PropertyName>{0}</PropertyName></TableColumnItem>' -f $textInfo.ToTitleCase($_.PropertyName.ToLower().Replace(" ","").Replace("-",""))})
+            '        </TableColumnItems>'
+            '       </TableRowEntry>'
+            '      </TableRowEntries>'
+            '     </TableControl>'
+            '    </View>'
+        }
+        '  </ViewDefinitions>'
+        '</Configuration>'
+    } > $generatedFormatFile
+    $generatedFormatFile
 }
 
 function Get-KubeDeployment 
@@ -195,17 +271,24 @@ function Get-KubeResource
 function Initialize-ProxyFunction
 {
     $r = Get-KubeResource
-    export-modulemember -Function 'Get-KubeResource', 'Initialize-ProxyFunction', 'Get-DefaultPSSession', 'Set-DefaultPSSession', 'Get-KubeRequireSudo', 'Set-KubeRequireSudo'
+    export-modulemember -Function 'Invoke-KubeCtl', 'Get-KubeResource', 'Initialize-ProxyFunction', 'Get-DefaultPSSession', 'Set-DefaultPSSession', 'Get-KubeRequireSudo', 'Set-KubeRequireSudo'
     $getters = $r.where({ $_.verbs -contains "get" })
     $getters.foreach({
         $resource = $_.Name
+        $kind = $_.kind
         $proxyKey = "get:{0}" -f $resource
         $implementation = $proxyFunctions[$proxyKey]
-        $functionName = "Get-Kube${resource}"
+        $functionName = "Get-Kube${kind}"
         if ( $implementation ) {
             [scriptblock]::Create("function global:${functionName} {
                     $implementation
                 }").Invoke()
+        }
+        elseif ($resource -as [type]) {
+            [scriptBlock]::Create("function global:$functionName {
+                    [CmdletBinding()]
+                    param ()
+                    (Invoke-KubeCtl -Verb get -resource $resource).Foreach({[$resource]::new(`$_)}) }").Invoke()
         }
         else {
             [scriptBlock]::Create("function global:$functionName {
@@ -276,4 +359,8 @@ function Invoke-KubeCtl
     }
 }
 
+$classStr = Get-ResourceTypes
+invoke-expression $classStr
+$generatedFormatFile = Initialize-Formatters
+update-formatdata $generatedFormatFile
 Initialize-ProxyFunction
