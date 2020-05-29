@@ -13,7 +13,7 @@ Some of these are not unique to PowerShell.
 Of course, the tools on UNIX also address some of these behaviors.
 Specifically, UNIX systems have man pages and the _mostly_ ubiquitous `--help` for getting assistance directly from the command.
 
-However, PowerShell does not have cmdlets for all aspects of administration on all platforms it is now available.
+However, PowerShell does not have cmdlets for all aspects of administration on all platforms. 
 There are a number of very excellent and needed tools which target the scenarios for administration and management very well.
 Some of these tools have existed for many years and have grown in functionality and complexity including their own 'mini-language'.
 Examples of these include:
@@ -43,6 +43,8 @@ There a many benefits in a complete rewrite of a command:
 
 The biggest issue with reimplementation is probably the amount of work that is needed to achieve behavior expressed in the original.
 This is especially the case if the reimplementor is not intimately familiar with the workings of the tool.
+
+TODO:  Jim, is it worth pointing out here that reimplementation is a short sighted view of the world - there will be updates to the original command functionality, sometimes very frequently.  My experience is that as a maintainer, my cost is rasied so high to maintain, that its not worth the initial time to develop the reimplenetation.  I guess this applies to wrapping teh command as well.
 
 ### API wrapping
 
@@ -117,11 +119,16 @@ This is what the developer did initially; He took the available APIs (REST or ot
 sheltering the admin from the programming problems.
 In the kubernetes example above, if I needed to query the REST endpoint to see what types of resources were available, that means more calls back and forth from the service.
 
+TODO - I use to have (at the tip of my tongue) an example of swagger cmdlets that showed the developers view -- this came up years ago for a while....  If you happen to know of a today example -- maybe it would be great to reference -- but i will see if I can find soemthing as well.
+
 ### Native Application Wrapping
 
 Because it is possible to call native applications easily from within PowerShell it is possible to write a script which provides a more PowerShell-like experience.
 It can provide parameter handling such as prompting for mandatory parameters and tab-completion for parameter values.
 It can take the application output and use the text output into objects so it can take advantage of all the post processing tools such as `Sort-Object`, `Where-Object`, etc.
+
+TODO: Jim, in the above list, would it be also good to mention somethig like : It can update itself when the originating native command updates.
+
 One of my first experiences with this was a very simple processes of getting information about pdf files with the tool `pdfinfo.exe`.
 I needed to retrieve information from a very large set of set of PDF files (1000s).
 I wrapped both the parameters and the output to have it behave much like a regular cmdlet.
