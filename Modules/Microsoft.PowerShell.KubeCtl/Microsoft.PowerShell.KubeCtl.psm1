@@ -4,10 +4,10 @@ class Readiness {
     [int]$Count
     [int]$Ready
     [string]ToString() {
-        return ("{0}/{1}" -f $this.count, $this.ready)
+        return ("{0}/{1}" -f $this.ready, $this.count)
     }
     Readiness([string]$r) {
-        $this.Count,$this.Ready = $r.Split("/")
+        $this.,$this.count = $r.Split("/")
     }
     Readiness([int]$c, [int]$r) {
         $this.count = $c
