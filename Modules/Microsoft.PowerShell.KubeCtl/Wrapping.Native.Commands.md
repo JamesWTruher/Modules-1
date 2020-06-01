@@ -234,6 +234,106 @@ I calculated column positions based on the fields I knew to be present and then 
 You can see the code in the function `get-kuberesource` and the constructor for the PowerShell class `KubeResource`.
 My plan was that these resources would drive the auto-generation of the Kubernetes resource functions.
 
+Now that I have the resources retrieved, I can auto-generate specific resource function for calling the `kubectl get <resource>`.
+At the time, I wanted some flexibility in the creation of these proxy functions,
+so I provided a way to include a specific implementation, if desired (see the `$proxyFunctions` hashtable).
+I'm not sure that's needed now, but we'll get to that later.
+The problem is that while the resource data can be returned as json, that json has absolutely no relation to the way the
+data is represented in the `kubectl get pod` table.
+I want to return the data as objects, I created classes for a couple resources by hand, but thought there might be a better way.
+
+I determined that when you get data from kubernetes, the table (both normal and wide) output _is created on the server_.
+This means the mapping of the properties of the json object to the table columns is defined in the server code.
+It is possible to provide data as custom columns, but you need to provide the value for the column with a json path expression,
+so it's not possible to automatically generate those tables.
+I thought it might be possible to provide a configuration file which could be read to automatically generate a PowerShell class
+which would include the name of the column and the expression to get the value for the object.
+This would allow a user to retrieve the json object and construct their custom object without touching the programming logic
+of the module but a configuration file.
+I created the `ResourceConfiguration.json` file to encapsulate all the resources that I had access to and provide a way where
+the object members can be customized where desired.
+
+here's an example:
+
+```json
+  {
+    "TypeName": "namespaces",
+    "Fields": [
+      {
+        "PropertyName": "NAME",
+        "PropertyReference": "$o.metadata.NAME"
+      },
+      {
+        "PropertyName": "STATUS",
+        "PropertyReference": "$o.status.phase"
+      },
+      {
+        "PropertyName": "AGE",
+        "PropertyReference": "$o.metadata.creationTimeStamp"
+      }
+    ]
+  },
+```
+
+This json is converted into a PowerShell class whose constructor takes the json object and assigns the values to the members,
+according to the `PropertyReference`.
+The module automatically attaches the original json to a hidden member `originalObject` so if you want to inspect
+all the data that's available, you can.
+The module also automatically generates a proxy function so you can get the data:
+
+```powershell
+function Get-KubeNamespace
+{
+  [CmdletBinding()]
+  param ()
+  (Invoke-KubeCtl -Verb get -resource namespaces).Foreach({[namespaces]::new($_)})
+}
+```
+
+This function is then exported so it's available in the module.
+When used, it behaves very close to the original:
+
+```powershell
+PS> Get-KubeNamespace
+
+Name                 Status Age
+----                 ------ ---
+default              Active 5/6/2020 6:13:07 PM
+default-mem-example  Active 5/14/2020 8:14:45 PM
+docker               Active 5/6/2020 6:14:25 PM
+kube-node-lease      Active 5/6/2020 6:13:05 PM
+kube-public          Active 5/6/2020 6:13:05 PM
+kube-system          Active 5/6/2020 6:13:05 PM
+kubernetes-dashboard Active 5/18/2020 8:44:01 PM
+openfaas             Active 5/6/2020 6:51:22 PM
+openfaas-fn          Active 5/6/2020 6:51:22 PM
+
+PS> kubectl get namespaces --all-namespaces
+
+NAME                   STATUS   AGE
+default                Active   26d
+default-mem-example    Active   18d
+docker                 Active   26d
+kube-node-lease        Active   26d
+kube-public            Active   26d
+kube-system            Active   26d
+kubernetes-dashboard   Active   14d
+openfaas               Active   26d
+openfaas-fn            Active   26d
+```
+
+but importantly, I can use the output with `where-object` and `foreach-object` or change the format to list, etc.
+
+```powershell
+PS> Get-KubeNamespace |? name -match "faas"
+
+Name        Status Age
+----        ------ ---
+openfaas    Active 5/6/2020 6:51:22 PM
+openfaas-fn Active 5/6/2020 6:51:22 PM
+```
+
+
 ### Second Experiment - Module KubectlHelpParser
 
 I wanted to see if I could read any help content from `kubectl` which would enable 
