@@ -6,11 +6,10 @@ PowerShell provides a number of benefits to it's users
 * a single parameter parser so errors about mis-parameter use are consistent across all commands
 * output consisting of objects (no text parsing)
 * common way to get assistance
-* ...
-* ...
+* <Jason can you fill in more details here?>
 
 Some of these are not unique to PowerShell.
-Of course, the tools on UNIX also address some of these behaviors.
+Of course, the tools on UNIX also provide some of these behaviors.
 Specifically, UNIX systems have man pages and the _mostly_ ubiquitous `--help` for getting assistance directly from the command.
 
 However, PowerShell does not have cmdlets for all aspects of administration on all platforms. 
@@ -48,8 +47,6 @@ Another issue with reimplementation is that you need to continue to track change
 This can be a challenge as depending on the activity and updates in the tool, wholescale changes can occur which then need to be reimplemented,
 or the reimplementation will be out of date.
 Worse, if the the command is the client side of a client/server app, changes in the server may negatively effect the reimplementation.
-
-TODO:  Jim, is it worth pointing out here that reimplementation is a short sighted view of the world - there will be updates to the original command functionality, sometimes very frequently.  My experience is that as a maintainer, my cost is rasied so high to maintain, that its not worth the initial time to develop the reimplenetation.  I guess this applies to wrapping teh command as well.
 
 ### API wrapping
 
@@ -103,27 +100,44 @@ foreach ( $item in $data.Items ) {
 }
 ```
 
-In the above example, there's 2 sections. First the section which gets the data from the REST endpoint and the second which changes the data into a usable form.
-There a couple of shortcuts in the first section:
+In the above example, the work of the script is broken into 2 sections.
 
+* a section which gets the data from the REST endpoint
+* a section which converts the json data into an object which has the specific properties I want to see
+
+There are a few shortcuts in the first section:
+
+* I'm not providing for parameter to retrieve different resources
 * I'm not using any authentication
 * I'm using what I already know with regard to the actual `url` to retrieve data
 
 The second section which alters the data to a form I need by converting the json to a view I'm more comfortable with.
-With regard to the output, I'm not handling the presentation of elapsed time the same way that the native tool does.
+With regard to the output, I made a decision to handle the presentation of elapsed time in a way that most cmdlets do.
 
 This approach casts the problem in the light of the developer again.
 Much like re-implementation, there is a certain amount of code that is required just to _get_ the data,
 and with this example I'm showing the absolute simplest case since I'm not doing any authentication and I _know what the endpoint to which I'm connecting.
+The part that is familiar is the second part of the script which creates an object which I can use with our other filters.
+This can be done in many different ways, I could have written this code using `Select-Object` as follows:
 
-I believe that the second section is well understood by PowerShell scripters, but the first section is less well known.
+```powershell
+$data.Items | Select-Object -Property @{ N = "Name"; E = {$_.metadata.Name}},
+     @{ N = "Ready"; E = { "{0}/{1}" -f ($_.item.status.conditions|Where-Object {$_.Ready -eq "True"}).Count, $_.status.containerstatuses.count}},
+     @{ N = "Status"; E = { @($_.status.containerstatuses.state.terminated.reason)[-1]}},
+     @{ N = "Restarts"; E = { $_.status.containerstatuses.restartcount}},
+     @{ N = "Age"; E = { [DateTime]::now.touniversaltime() - [datetime]($_.status.conditions.lastTransitionTime[-1])}}
+```
+
+Regardless of how it's written, I believe that the second section is well understood by most PowerShell scripters,
+but the first section is less known and needs knowledge about the service and how to authenticate.
 
 *However*, I think the biggest issue with this approach is that for anything complicated (or anything more complicated than simple "gets") is that the REST APIs are developer constructs _made for developers_.
-This means that if you want to use these REST APIs, you need to put on a developer hat and produce a solution with a different set of problems.
+This means that if you want to use these REST APIs, you need to put on a developer hat and produce a solution which has a different set of problems.
 This is what the developer did initially; He took the available APIs (REST or otherwise) and built up the administrative experience in the application,
 sheltering the admin from the programming problems.
 In the kubernetes example above, if I needed to query the REST endpoint to see what types of resources were available, that means more calls back and forth from the service.
 
+_Jason - I don't have anything here_
 TODO - I use to have (at the tip of my tongue) an example of swagger cmdlets that showed the developers view -- this came up years ago for a while....  If you happen to know of a today example -- maybe it would be great to reference -- but i will see if I can find soemthing as well.
 
 ### Native Application Wrapping
@@ -131,10 +145,29 @@ TODO - I use to have (at the tip of my tongue) an example of swagger cmdlets tha
 Because it is possible to call native applications easily from within PowerShell it is possible to write a script which provides a more PowerShell-like experience.
 It can provide parameter handling such as prompting for mandatory parameters and tab-completion for parameter values.
 It can take the application output and use the text output into objects so it can take advantage of all the post processing tools such as `Sort-Object`, `Where-Object`, etc.
+
+if we look at the above example, the script can be greatly simplified and written as follows
+
+```powershell
+$data = kubectl get pods -o json | ConvertFrom-Json
+$data.Items | Select-Object -Property @{ N = "Name"; E = {$_.metadata.Name}},
+     @{ N = "Ready";    E = { "{0}/{1}" -f ($_.item.status.conditions|Where-Object {$_.Ready -eq "True"}).Count, $_.status.containerstatuses.count}},
+     @{ N = "Status";   E = { @($_.status.containerstatuses.state.terminated.reason)[-1]}},
+     @{ N = "Restarts"; E = { $_.status.containerstatuses.restartcount}},
+     @{ N = "Age";      E = { [DateTime]::now.touniversaltime() - [datetime]($_.status.conditions.lastTransitionTime[-1])}}
+```
+
+When applicatons have a choice of output types, it is easy to use PowerShell tools to convert (in this case) json to an object,
+and then we have the same code for presenting the data the way we want it.
+
 This approach has some advantages:
 
-* We are using an interface
+* We avoid the entire problem of how to authenticate to access the data
+  * We are protected from changes in the service and API endpoint
+* Small changes in the tool can be easily managed by simple changes to the script
+* If the application is supports uniform cross-platform execution, the wrapper can be easy run on whatever platform is needed
 
+_Jason - not sure what more I should add here_
 TODO: Jim, in the above list, would it be also good to mention somethig like : It can update itself when the originating native command updates.
 
 One of my first experiences with this was a very simple processes of getting information about pdf files with the tool `pdfinfo.exe`.
@@ -160,20 +193,52 @@ The point of all this was that I wanted a native PowerShell experience rather th
 #### Issues with application wrapping
 
 The issues are roughly the same as above, there is a certain amount of programming that is needed to call the application.
-There is more programming needed to convert the text output to objects so they can participate in the PowerShell pipelines.
+There is some programming needed to convert the text output to objects so they can participate in the PowerShell pipelines.
 A significant difference is that unlike the REST approach, I don't have extra work determining _how_ to invoke the app, I can just invoke it.
 Further, it seems a more natural use of the tool; I'm familiar with the workings of the tool, I'm just parsing the output into objects.
-It's important to note that if the tool were to emit json or xml, a lot less effort would be needed to create the objects that I want.
+It's important to note that if the tool emits `json`, `xml`, or other structured data, a lot less effort would be needed to create the objects that I want.
 
 ## Is there a better way
 
-It may be possible to create a framework which inspects the output of the help of utility and _automatically_ create the code which uses
+It may be possible to create a framework which inspects the help of the application and _automatically_ create the code which calls the underlying application.
+This framework can also handle the output mapping to an object more suitable for the PowerShell environment.
 
 ## possibilities in wrapping
 
 The aspect which makes this possible is that some commands have regular, consistent help which describes how the application can be used.
 If this is the case, then we can iteratively call the help, parse it,
 and automatically construct much of the infrastructure needed to allow these native applications to be encorporated into the PowerShell environment.
+
+### First Experiment - Module Microsoft.PowerShell.Kubectl
+
+I created a wrapper for to take the output of `kubectl api-resources` and create functions for each returned resource.
+This way, instead of running `kubectl get pod`, I could run `Get-KubectlPod` (a much more _PowerShell_ like experience).
+I also wanted to have the function return objects which I could then use the other PowerShell tools (where-object, foreach-object, etc).
+To do this, I needed a way to map the output (json) from the `kubectl` tool to PowerShell objects.
+I decided that a reasonable approach for this was to use a more declarative to map the property in the json to a PowerShell class member.
+
+There were some problems that I wanted to solve with this first experiment
+
+* wrap `kubectl api-resources` in a function
+  * automatically create object output from `kubectl api-resources`
+* Auto-generate functions for each resource which could be retrieved (only resource get for now)
+  * only support `name` as a parameter
+* Auto-generate the conversion of output to objects to look similar to the usual `kubectl` output
+
+When it came to wrapping `kubectl api-resources` I took the static approach rather than auto generation.
+First, because it was my first attempt so I was still finding my feet.
+Second, because this is one of the `kubectl` commands which does not emit jason,
+so I took the path of parsing the output of `kubectl api-resources -o wide`.
+My concern is that I wasn't sure whether the table changes width based on the screen width.
+I calculated column positions based on the fields I knew to be present and then sent the line with the offsets off to be parsed.
+You can see the code in the function `get-kuberesource` and the constructor for the PowerShell class `KubeResource`.
+My plan was that these resources would drive the auto-generation of the Kubernetes resource functions.
+
+### Second Experiment - Module KubectlHelpParser
+
+I wanted to see if I could read any help content from `kubectl` which would enable 
+
+
 
 ## Is this framework something you will continue to build commands with?
 
