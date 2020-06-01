@@ -333,12 +333,159 @@ openfaas    Active 5/6/2020 6:51:22 PM
 openfaas-fn Active 5/6/2020 6:51:22 PM
 ```
 
-
 ### Second Experiment - Module KubectlHelpParser
 
-I wanted to see if I could read any help content from `kubectl` which would enable 
+I wanted to see if I could read any help content from `kubectl` which would enable me to auto-generate a complete
+proxy to the `kubectl` command which included general parameters, command specific parameters, and help.
+It turns out that `kubectl` help is regular enough where this is quite possible.
+
+When retrieving help, kubectl may provide subcommands which also has structured help.
+I created a recursive parser which allowed me to retrieve all of the help for all of the available kubectl commands.
+This means that if an additional command is provided in the future, and the help for that command follows the
+existing pattern for help, this parser will be able to generate a command for it.
+
+```powershell
+PS> kubectl --help
+kubectl controls the Kubernetes cluster manager.
+
+ Find more information at: https://kubernetes.io/docs/reference/kubectl/overview/
+
+Basic Commands (Beginner):
+  create         Create a resource from a file or from stdin.
+  expose         Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service
+  run            Run a particular image on the cluster
+  set            Set specific features on objects
+
+Basic Commands (Intermediate):
+  explain        Documentation of resources
+  get            Display one or many resources
+. . .
+
+kubectl set --help
+
+PS> kubectl set --help
+
+Configure application resources
+
+ These commands help you make changes to existing application resources.
+
+Available Commands:
+  env            Update environment variables on a pod template
+  . . .
+  subject        Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding
+
+Usage:
+  kubectl set SUBCOMMAND [options]
+
+PS> kubectl set env --help 
+
+Update environment variables on a pod template.
+
+ List environment variable definitions in one or more pods, pod templates. Add, update, or remove container environment
+variable definitions in one or more pod templates (within replication controllers or deployment configurations). View or
+modify the environment variable definitions on all containers in the specified pods or pod templates, or just those that
+match a wildcard.
+
+ If "--env -" is passed, environment variables can be read from STDIN using the standard env syntax.
+
+ Possible resources include (case insensitive):
+
+  pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)
+
+Examples:
+  # Update deployment 'registry' with a new environment variable
+  kubectl set env deployment/registry STORAGE_DIR=/local
+  . . .
+  # Set some of the local shell environment into a deployment config on the server
+  env | grep RAILS_ | kubectl set env -e - deployment/registry
+
+Options:
+      --all=false: If true, select all resources in the namespace of the specified resource types
+      --allow-missing-template-keys=true: If true, ignore any errors in templates when a field or map key is missing in
+the template. Only applies to golang and jsonpath output formats.
+  . . .
+      --template='': Template string or path to template file to use when -o=go-template, -o=go-template-file. The
+template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+
+Usage:
+  kubectl set env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N [options]
+
+Use "kubectl options" for a list of global command-line options (applies to all commands).
+```
+
+The main function of the module will recursively collect the help for all of the commands, and construct an
+object representation which I hope can then be used to generate the proxy functions.
+This is still very much a work in progress, but it is definitely showing promise.
+Here's an example of what it can already do.
+
+```powershell
+PS> import-module ./khp2.psm1
+ PS> import-module ./KHP2.psm1 -force
+
+[Modules-1|kubectl↑0↓0•0+2?5] PS> $res = get-kubecommands           
+
+VERBOSE: kubectl --help
+VERBOSE: kubectl  create --help
+. . .
+VERBOSE: kubectl  set --help
+VERBOSE: kubectl  set env --help
+VERBOSE: kubectl  set image --help
+VERBOSE: kubectl  set resources --help
+VERBOSE: kubectl  set selector --help
+. . .
+VERBOSE: kubectl  plugin --help
+VERBOSE: kubectl  plugin list --help
+VERBOSE: kubectl  version --help
+
+PS> $res.subcommands[3].subcommands[0]
+
+Command             : set env
+CommandElements     : {, set, env}
+Description         : Update environment variables on a pod template.
+                      
+                       List environment variable definitions in one or more pods, pod templates. Add, update, or remove container environment variable definitions in one or more pod templates (within replication controllers or deployment configurations). View or modify the environment variable definitions 
+                      on all containers in the specified pods or pod templates, or just those that match a wildcard.
+                      
+                       If "--env -" is passed, environment variables can be read from STDIN using the standard env syntax.
+                      
+                       Possible resources include (case insensitive):
+                      
+                        pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)
+Usage               : kubectl set env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N [options]
+SubCommands         : {}
+Parameters          : {[Parameter(Mandatory=$False)][switch]${All}, [Parameter(Mandatory=$False)][switch]${NoAllowMissingTemplateKeys}, [Parameter(Mandatory=$False)][System.String]${Containers} = "*", [Parameter(Mandatory=$False)][switch]${WhatIf}…}
+MandatoryParameters : {}
+Examples            : {kubectl set env deployment/registry STORAGE_DIR=/local, kubectl set env deployment/sample-build --list, kubectl set env pods --all --list, kubectl set env deployment/sample-build STORAGE_DIR=/data -o yaml…}
+
+PS> $res.subcommands[3].subcommands[0].usage   
+Usage                                                               supportsFlags hasOptions
+-----                                                               ------------- ----------
+kubectl set env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N [options]         False       True
+
+PS> $res.subcommands[3].subcommands[0].examples
+Description                                                   Command
+-----------                                                   -------
+Update deployment 'registry' with a new environment variable  kubectl set env deployment/registry STORAGE_DIR=/local
+. . .
+
+PS> $res.subcommands[3].subcommands[0].parameters.Foreach({$_.tostring()})
+
+[Parameter(Mandatory=$False)][switch]${All}
+[Parameter(Mandatory=$False)][switch]${NoAllowMissingTemplateKeys}
+[Parameter(Mandatory=$False)][System.String]${Containers} = "*"
+[Parameter(Mandatory=$False)][switch]${WhatIf}
+. . .
+[Parameter(Mandatory=$False)][System.String]${Selector}
+[Parameter(Mandatory=$False)][System.String]${Template}
+
+```
 
 
+
+
+## Call To Action
+
+First, I'm really interested if having a framework which can autogenerate functions which wrap a native executable
 
 ## Is this framework something you will continue to build commands with?
 
