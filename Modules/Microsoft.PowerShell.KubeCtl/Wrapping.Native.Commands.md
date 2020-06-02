@@ -480,17 +480,26 @@ PS> $res.subcommands[3].subcommands[0].parameters.Foreach({$_.tostring()})
 
 ```
 
+There are still a lot of open questions and details to work out here:
 
-
+* how are mandatory parameters determined?
+* how do we keep a map of used parameters?
+* does parameter order matter?
+* can resonable debugging be provided?
+* do we have to "boil the ocean" to provide something useful?
 
 ## Call To Action
 
-First, I'm really interested if having a framework which can autogenerate functions which wrap a native executable
+First, I'really interested if having a framework which can autogenerate functions which wrap a native executable is useful?
+The obvious response might be "of course", but how much of a solution is really needed to provide value?
 
-## Is this framework something you will continue to build commands with?
+**Jason** can you think of additional things here in the call to action?
+
+## Is this framework something you will continue to build commands with
 
 Jim, just adding some thought notes.  Always available to discuss with you and help out.
 
-Our focus is on providing the community with an extensable framework to build powershell-style cmdlets from common commands.  While we may supply some commands (kubectl, docker), our hope is that the community will adopt the framework and build commands as needed. 
-  - Is an extensable framework for building commands needed? Why?
-  - If so, what commands should be considered in the near term? Why those commands? How often do you use/script them?
+Our focus is on providing the community with an extensable framework to build powershell-style cmdlets from common commands.  While we may supply some commands (kubectl, docker), our hope is that the community will adopt the framework and build commands as needed.
+
+* Is an extensible framework for building commands needed? Why?
+* If so, what commands should be considered in the near term? Why those commands? How often do you use/script them?

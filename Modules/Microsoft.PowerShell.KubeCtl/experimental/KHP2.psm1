@@ -98,7 +98,7 @@ class ParameterInfo {
     hidden [string]$originalText
     ParameterInfo ([string]$text, [bool]$isMandatory = $false) {
         $this.originalText = $text
-        if ( $text -match ".* --(?<option>.*): (?<Description>.*)" ) {
+        if ( $text -match ".* --(?<option>.[^ ]*): (?<Description>.*)" ) {
             $pname,$default = $matches['option'] -split "="
             $this.OriginalParameterName = "--${pname}"
             $pDefaultValue = $default.Trim("'")
@@ -315,7 +315,7 @@ class Command {
 
     [string]CreateParamStatement() {
         $sb = [System.Text.StringBuilder]::new()
-        $param = $()
+        $param = @()
         $sb.AppendLine("param (")
         $this.MandatoryParameters.Foreach({$param += $_.ToString()})
         $this.Parameters.Foreach({$param += $_.ToString()})
@@ -369,21 +369,24 @@ class Command {
         return ($dText -join [Environment]::newline)
     }
 
-
     [string]CreateProxyFunction() {
         [string[]]$s = .{
-            'function Invoke-Kube{0}' -f $this.Name
+            'function Invoke-Kube{0}' -f ($this.CommandElements -join "")
             '{'
+            '[CmdletBinding()]'
             $this.CreateParamStatement()
-            $commandArguments = $this.GetCommandArguments()
+            $this.GetParameterMap()
+            '$commandArguments = $PSBoundParameters.Keys.Foreach({"{0} ''{1}''" -f $_parameterMap[$_],$PSBoundParameters[$_]})'
+            'if ( $env:DEBUGPROXYFUNCTION -eq 1 ) { wait-debugger }'
             if ( $this.SupportsJsonOutput ) {
-                "kubectl $commandArguments -o json"
+                'kubectl $commandArguments -o json'
             }
             else {
-                "kubectl $commandArguments"
+                'kubectl $commandArguments'
             }
             '}'
         }
+        wait-debugger
         return ($s -join [environment]::NewLine)
     }
 
@@ -393,8 +396,9 @@ class Command {
     [string]GetParameterMap() {
         [string[]]$parameterStrings = '$_parameterMap = @{ '
         foreach ( $parameter in $this.Parameters ) {
-            $parameterStrings += "'{0}' = '{1}'"
+            $parameterStrings += "'{0}' = '{1}'" -f $parameter.Name,$parameter.OriginalParameterName
         }
+        $parameterStrings += "}"
         return ($parameterStrings -join [Environment]::NewLine)
     }
 
