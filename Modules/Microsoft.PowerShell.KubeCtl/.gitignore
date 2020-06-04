@@ -1,0 +1,4 @@
+
+*.nupkg
+Generated.Format.ps1xml
+out/
