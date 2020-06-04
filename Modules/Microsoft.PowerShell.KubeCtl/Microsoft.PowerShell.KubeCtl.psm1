@@ -110,38 +110,37 @@ function Initialize-Formatters ( [string]$resourceJson = "${psscriptroot}/Resour
     $generatedFormatFile
 }
 
-function Get-KubeDeployment 
+function Get-KubeDeployment
 {
-    param ( $name = ".*" )
+    param ( $name = "*" )
     $items = Invoke-KubeCtl -verb get -resource deployment
-    $items.ForEach({[deployment]::new($_)}).Where({$_.name -match "$name"})
+    $items.ForEach({[deployment]::new($_)}).Where({$_.name -like "$name"})
 }
 
 $proxyFunctions = @{
     "get:deployments" = {
         [CmdletBinding()]
-        param ($name = ".*")
+        param ($name = "*")
         $items = Invoke-KubeCtl -verb get -resource deployment
-        $items.ForEach({[deployment]::new($_)}).Where({$_.name -match "$name"})
+        $items.ForEach({[deployment]::new($_)}).Where({$_.name -like "$name"})
         }
-    
     "get:pods" = {
         [CmdletBinding()]
-        param ( $name = ".*" )
+        param ( $name = "*" )
         $items = Invoke-KubeCtl -verb get -resource pod
-        $items.foreach({[Pod]::new($_)}).Where({$_.Name -match $name})
+        $items.foreach({[Pod]::new($_)}).Where({$_.Name -like $name})
         }
     "get:endpoints" = {
         [CmdletBinding()]
-        param ($name = ".*")
+        param ($name = "*")
         $items = Invoke-KubeCtl -verb get -resource endpoints
-        $items.ForEach({[endpoints]::new($_)}).Where({$_.name -match "$name"})
+        $items.ForEach({[endpoints]::new($_)}).Where({$_.name -like "$name"})
     }
     "get:events" = {
         [CmdletBinding()]
-        param ($name = ".*")
+        param ($name = "*")
         $items = Invoke-KubeCtl -verb get -resource events
-        $items.ForEach({[events]::new($_)}).Where({$_.name -match "$name"})
+        $items.ForEach({[events]::new($_)}).Where({$_.name -like "$name"})
     }
 }
 
@@ -221,6 +220,12 @@ else {
     $DefaultRequireSudo = $false
 }
 
+<#
+.SYNOPSIS
+Set the session for executing kubectl
+.DESCRIPTION
+Do not use, untested
+#>
 function Set-DefaultPSSession
 {
     [CmdletBinding(SupportsShouldProcess=$true)]
@@ -230,6 +235,12 @@ function Set-DefaultPSSession
     }
 }
 
+<#
+.SYNOPSIS
+Get the session for executing kubectl
+.DESCRIPTION
+Do not use, untested
+#>
 function Get-DefaultPSSession
 {
     [CmdletBinding()]
@@ -237,6 +248,12 @@ function Get-DefaultPSSession
     return $script:DEFAULTSESSION
 }
 
+<#
+.SYNOPSIS
+Get whether invoking kubectl requries sudo
+.DESCRIPTION
+Do not use, it is not cross platform yet
+#>
 function Get-KubeRequireSudo
 {
     [CmdletBinding()]
@@ -244,6 +261,12 @@ function Get-KubeRequireSudo
     return $script:DefaultRequireSudo
 }
 
+<#
+.SYNOPSIS
+Set whether invoking kubectl requries sudo
+.DESCRIPTION
+Do not use, it is not cross platform yet
+#>
 function Set-KubeRequireSudo
 {
     [CmdletBinding(SupportsShouldProcess=$true)]
@@ -253,6 +276,13 @@ function Set-KubeRequireSudo
     }
 }
 
+<#
+.SYNOPSIS
+Retrieve the available api-resources
+.DESCRIPTION
+This converts the table output of kubectl api-resources to
+a set of objects which will then be used to create the proxy functions
+#>
 function Get-KubeResource
 {
     [CmdletBinding()]
@@ -268,6 +298,13 @@ function Get-KubeResource
     return $script:KUBERESOURCES.Where({$_.name -match $name})
 }
 
+<#
+.SYNOPSIS
+Create the proxy functions for the module
+.DESCRIPTION
+This discovers the available resources and creates a proxy function that you can call
+It essentially converts 'kubectl get pod' to 'Get-KubePod'
+#>
 function Initialize-ProxyFunction
 {
     $r = Get-KubeResource
@@ -287,8 +324,8 @@ function Initialize-ProxyFunction
         elseif ($resource -as [type]) {
             [scriptBlock]::Create("function global:$functionName {
                     [CmdletBinding()]
-                    param ()
-                    (Invoke-KubeCtl -Verb get -resource $resource).Foreach({[$resource]::new(`$_)}) }").Invoke()
+                    param ([string]`$Name = `"*`")
+                    (Invoke-KubeCtl -Verb get -resource $resource).Foreach({[$resource]::new(`$_)}).Where({`$_.Name -like `"`$Name`"}) }").Invoke()
         }
         else {
             [scriptBlock]::Create("function global:$functionName {
@@ -300,7 +337,7 @@ function Initialize-ProxyFunction
     })
 
     <#
-    [scriptblock]::Create('function global:get-kubepod { 
+    [scriptblock]::Create('function global:get-kubepod {
         param ( $name = ".*" )
         $items = Invoke-KubeCtl -verb get -resource pod
         $items.foreach({[Pod]::new($_)}).Where({$_.Name -match $name})
@@ -310,9 +347,15 @@ function Initialize-ProxyFunction
     # write-verbose -verbose "export?"
 }
 
+<#
+.SYNOPSIS
+Invoke kubectl with arguments
+.DESCRIPTION
+Invoke kubectl with arguments
+#>
 function Invoke-KubeCtl
 {
-    param ( 
+    param (
         [switch]$requireSudo,
         [System.Management.Automation.Runspaces.PSSession]$session = $script:DEFAULTSESSION,
         [string]$verb,
@@ -360,7 +403,9 @@ function Invoke-KubeCtl
 }
 
 $classStr = Get-ResourceTypes
-invoke-expression $classStr
+$sb = [scriptblock]::create($classStr)
+. $sb
+#invoke-expression $classStr
 $generatedFormatFile = Initialize-Formatters
 update-formatdata $generatedFormatFile
 Initialize-ProxyFunction
