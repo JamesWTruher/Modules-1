@@ -1,11 +1,13 @@
+# Getting Started with Kubernetes on Docker
+
 It is relatively easy to setup Kubernetes on Docker and install OpenFaas.
 First, ensure that Kubernetes is running in your Docker environment.
 
-<img src="dockerinfo.png" width="480" alt="docker version" />
+![docker version](dockerinfo.png)
 
 ensure that kubernetes is configured
 
-<img src="kubernetes.png" width="480" alt="docker version" />
+![kubernetes running](kubernetes.png)
 
 Next clone the OpenFaas repo (this isn't strictly needed, but makes things _way_ easier) and set your location to the repo base.
 
@@ -70,7 +72,7 @@ openfaas      gateway-db946ddcd-s4vht                  2/2     Running   1      
 openfaas      nats-7c4d874896-n4j6c                    1/1     Running   0          5h12m
 openfaas      prometheus-758c66f77b-vwvpw              1/1     Running   0          5h12m
 openfaas      queue-worker-6b89d664f-m8ls7             1/1     Running   0          5h12m
-PS> 
+PS>
 ```
 
 Now we can install a couple of openfaas functions.
@@ -90,18 +92,18 @@ faas-cli store deploy nodeinfo
 now we can invoke the new functions:
 
 ```powershell
-"OpenFaas!"| faas-cli invoke figlet 
+"OpenFaas!"| faas-cli invoke figlet
 ```
 
 you should see some output like:
 
 ```powershell
-  ___                   _____               _ 
+  ___                   _____               _
  / _ \ _ __   ___ _ __ |  ___|_ _  __ _ ___| |
 | | | | '_ \ / _ \ '_ \| |_ / _` |/ _` / __| |
 | |_| | |_) |  __/ | | |  _| (_| | (_| \__ \_|
  \___/| .__/ \___|_| |_|_|  \__,_|\__,_|___(_)
-      |_|                                     
+      |_|
 ```
 
 ```powershell
@@ -139,16 +141,16 @@ kubectl create clusterrolebinding dashboard-admin-sa --clusterrole=cluster-admin
 now get the token associated with the service (but you need the "real" name of the secret):
 
 ```powershell
-kubectl get secrets                 
+kubectl get secrets
 NAME                             TYPE                                  DATA   AGE
 dashboard-admin-sa-token-f8qwd   kubernetes.io/service-account-token   3      13m
 default-token-2qv9g              kubernetes.io/service-account-token   3      12d
-```
 
 $sec = kubectl get secret dashboard-admin-sa-token-f8qwd -o json | convertfrom-json
 $bytes = [Convert]::FromBase64String($sec.data.token)
 $token = [Text.Encoding]::UTF8.GetString($bytes)
 $token
+
 ```
 
 in another window, start the ui proxy (this will block):
