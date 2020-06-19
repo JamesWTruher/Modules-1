@@ -1,4 +1,5 @@
 $TextInfo = [CultureInfo]::new("en-us",$false).TextInfo
+$Executable = "kubectl"
 
 class Readiness {
     [int]$Count
@@ -178,7 +179,7 @@ class Pod {
 function Get-KubePod2
 {
     param ( $name = ".*" )
-    $items = (kubectl get pods --all-namespaces -o json | ConvertFrom-Json).Items
+    $items = (& ${executable} get pods --all-namespaces -o json | ConvertFrom-Json).Items
     $items.foreach({[Pod]::new($_)}).Where({$_.Name -match $name})
 }
 
@@ -286,10 +287,10 @@ a set of objects which will then be used to create the proxy functions
 function Get-KubeResource
 {
     [CmdletBinding()]
-    param ( [string]$name = ".*" )
-    # $res = kubectl api-resources -o wide
-    if ( ! $script:KUBERESOURCES ) {
-        write-debug "running!"
+    param ( [string]$name = ".*", [switch]$Force )
+    # kubectl api-resources -o wide
+    # We do a little caching here, -force will ensure we go back and collect resources
+    if ( ! $script:KUBERESOURCES -or $Force) {
         $res = Invoke-KubeCtl -verb "" -resource "api-resources"  -noJson -arguments @("-o","wide") -noAllNamespace
         $FIELDS = "NAME","SHORTNAMES","APIGROUP","NAMESPACED","KIND","VERBS"
         $offsets = $FIELDS.ForEach({$res[0].IndexOf("$_")})
@@ -309,6 +310,11 @@ function Initialize-ProxyFunction
 {
     $r = Get-KubeResource
     export-modulemember -Function 'Invoke-KubeCtl', 'Get-KubeResource', 'Initialize-ProxyFunction', 'Get-DefaultPSSession', 'Set-DefaultPSSession', 'Get-KubeRequireSudo', 'Set-KubeRequireSudo'
+    # for each resource that has a get verb, create a function
+    # which can retrieve and display it.
+    # in the case that there is a provided implementation, use it
+    # otherwise create default which has a name parameter
+    # This should probably include a namespace parameter where the resource supports namespaces
     $getters = $r.where({ $_.verbs -contains "get" })
     $getters.foreach({
         $resource = $_.Name
@@ -336,15 +342,6 @@ function Initialize-ProxyFunction
         Export-ModuleMember -Function $functionName
     })
 
-    <#
-    [scriptblock]::Create('function global:get-kubepod {
-        param ( $name = ".*" )
-        $items = Invoke-KubeCtl -verb get -resource pod
-        $items.foreach({[Pod]::new($_)}).Where({$_.Name -match $name})
-    } ').Invoke()
-    Export-ModuleMember -Function get-kubepod
-    #>
-    # write-verbose -verbose "export?"
 }
 
 <#
@@ -355,6 +352,7 @@ Invoke kubectl with arguments
 #>
 function Invoke-KubeCtl
 {
+    [CmdletBinding()]
     param (
         [switch]$requireSudo,
         [System.Management.Automation.Runspaces.PSSession]$session = $script:DEFAULTSESSION,
@@ -367,10 +365,10 @@ function Invoke-KubeCtl
 
     [string[]]$action = @()
     if ( $requireSudo -or $script:DefaultRequireSudo) {
-        $action += "sudo kubectl"
+        $action += "sudo ${executable}"
     }
     else {
-        $action += "kubectl"
+        $action += "${executable}"
     }
 
     $action += $verb
@@ -382,16 +380,28 @@ function Invoke-KubeCtl
         $action += "-o","json"
     }
     $action += $arguments
+    # always multiplex the error stream to be sure that we get them
+    # we will de-multiplex them after the execution.
+    $action += '2>&1'
     # create the script block to execute
     [scriptblock]$action = [scriptblock]::create($action)
 
     Write-Debug -Message ("SESSION IS NULL: {0}" -f $null -eq $script:DEFAULTSESSION)
+    Write-Debug -Message $action.ToString()
     if ( $session ) {
-        $result = invoke-command -session $session -scriptblock $action
+        $allOutput = invoke-command -session $session -scriptblock $action
     }
     else {
-        $result = & $action
+        $allOutput = & $action
     }
+    $execErrors = $allOutput | Where-Object { $_ -is [System.Management.Automation.ErrorRecord]}
+    $result     = $allOutput | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord]}
+
+    # should this throw?
+    if ( $execErrors ) {
+        $execErrors | Write-Error 
+    }
+
 
     if ( ! $noJson ) {
         $convertedResult = $result | ConvertFrom-Json
